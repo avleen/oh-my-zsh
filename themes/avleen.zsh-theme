@@ -175,7 +175,7 @@ prompt_status() {
 }
 
 prompt_time() {
-  prompt_segment black magenta '%T'
+  prompt_segment black magenta '%*'
 }
 
 ## Main prompt
