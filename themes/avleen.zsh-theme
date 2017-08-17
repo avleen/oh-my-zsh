@@ -114,7 +114,8 @@ prompt_git() {
 
 prompt_hg() {
   local rev status
-  if $(hg id >/dev/null 2>&1); then
+  hg_id=$(hg id -n -b 2>/dev/null)
+  if [ $? -eq 0 ]; then
     if $(hg prompt >/dev/null 2>&1); then
       if [[ $(hg prompt "{status|unknown}") = "?" ]]; then
         # if files are not added
@@ -131,12 +132,13 @@ prompt_hg() {
       echo -n $(hg prompt "☿ {rev}@{branch}") $st
     else
       st=""
-      rev=$(hg id -n 2>/dev/null | sed 's/[^-0-9]//g')
-      branch=$(hg id -b 2>/dev/null)
-      if `hg st | grep -q "^\?"`; then
+      rev=$( echo ${hg_id} | cut -f1 -d" " | sed 's/[^-0-9]//g')
+      branch=$( echo ${hg_id} | cut -f2 -d" " )
+      hg_st=$(hg st)
+      if $( echo ${hg_st} | grep -q "^\?" ); then
         prompt_segment red black
         st='±'
-      elif `hg st | grep -q "^[MA]"`; then
+      elif $( echo ${hg_st} | grep -q "^[MA]" ); then
         prompt_segment yellow black
         st='±'
       else
