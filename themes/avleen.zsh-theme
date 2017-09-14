@@ -114,39 +114,91 @@ prompt_git() {
 
 prompt_hg() {
   local rev status
-  hg_id=$(hg id -n -b 2>/dev/null)
-  if [ $? -eq 0 ]; then
-    if $(hg prompt >/dev/null 2>&1); then
-      if [[ $(hg prompt "{status|unknown}") = "?" ]]; then
-        # if files are not added
-        prompt_segment red white
-        st='±'
-      elif [[ -n $(hg prompt "{status|modified}") ]]; then
-        # if any modification
-        prompt_segment yellow black
-        st='±'
-      else
-        # if working copy is clean
-        prompt_segment green black
-      fi
-      echo -n $(hg prompt "☿ {rev}@{branch}") $st
-    else
-      st=""
-      rev=$( echo ${hg_id} | cut -f1 -d" " | sed 's/[^-0-9]//g')
-      branch=$( echo ${hg_id} | cut -f2 -d" " )
-      hg_st=$(hg st)
-      if $( echo ${hg_st} | grep -q "^\?" ); then
-        prompt_segment red black
-        st='±'
-      elif $( echo ${hg_st} | grep -q "^[MA]" ); then
-        prompt_segment yellow black
-        st='±'
-      else
-        prompt_segment green black
-      fi
-      echo -n "☿ $rev@$branch" $st
+  setopt promptsubst
+  autoload -Uz vcs_info
+  zstyle ':vcs_info:*' enable hg
+  zstyle ':vcs_info:*' get-revision true
+  zstyle ':vcs_info:hg*:*' get-bookmarks true
+  zstyle ':vcs_info:*' check-for-changes true
+  zstyle ':vcs_info:*' formats " %h@"
+  zstyle ':vcs_info:*' actionformats " %h@"
+  vcs_info
+  if [[ -n ${vcs_info_msg_0_} ]]; then
+    # Find the root
+    this_dir=${PWD}
+    while [[ ${this_dir} != '/' ]]; do
+        if [[ -d ${this_dir}/.hg ]]; then
+            hg_root=${this_dir}
+            break
+        else
+            this_dir=$( dirname ${this_dir} )
+        fi
+    done
+    if [[ ! -f /tmp/zsh_hg_st.$$ || ${hg_root}/.hg/fsmonitor.state -nt /tmp/zsh_hg_st.$$ ]]; then
+      hg st > /tmp/zsh_hg_st.$$ 2>/dev/null &
+      hg id -n -b > /tmp/zsh_hg_id.$$ 2>/dev/null &
+      wait
+      # running `hg st` or `hg id` causes the fsmonitor.state file to get
+      # updated. We touch our own state files to make sure they're seen as newer
+      # on the next run.
+      touch /tmp/zsh_hg_id.$$
+      touch /tmp/zsh_hg_st.$$
     fi
+    hg_st=$( cat /tmp/zsh_hg_st.$$ )
+    hg_id=$( cat /tmp/zsh_hg_id.$$ )
+    if [[ -e ${hg_root}/.hg/bookmarks.current ]]; then
+      hg_bookmark=$( cat ${hg_root}/.hg/bookmarks.current )
+    else
+      hg_bookmark='none'
+    fi
+    rev=$( echo ${hg_id} | cut -f1 -d" " | sed 's/[^-0-9]//g')
+    #branch=$( echo ${hg_id} | cut -f2 -d" " )
+    st=""
+    if $( echo ${hg_st} | grep -q "^\?" ); then
+      prompt_segment red black
+      st='±'
+    elif $( echo ${hg_st} | grep -q "^[MA]" ); then
+      prompt_segment yellow black
+      st='±'
+    else
+      prompt_segment green black
+    fi
+    echo -n "☿ $rev@$hg_bookmark" $st
   fi
+
+  # hg_id=$(hg id -n -b 2>/dev/null)
+  # if [ $? -eq 0 ]; then
+  #   if $(hg prompt >/dev/null 2>&1); then
+  #     if [[ $(hg prompt "{status|unknown}") = "?" ]]; then
+  #       # if files are not added
+  #       prompt_segment red white
+  #       st='±'
+  #     elif [[ -n $(hg prompt "{status|modified}") ]]; then
+  #       # if any modification
+  #       prompt_segment yellow black
+  #       st='±'
+  #     else
+  #       # if working copy is clean
+  #       prompt_segment green black
+  #     fi
+  #     echo -n $(hg prompt "☿ {rev}@{branch}") $st
+  #   else
+  #     st=""
+  #     rev=$( echo ${hg_id} | cut -f1 -d" " | sed 's/[^-0-9]//g')
+  #     branch=$( echo ${hg_id} | cut -f2 -d" " )
+  #     hg_st=$(hg st)
+  #     if $( echo ${hg_st} | grep -q "^\?" ); then
+  #       prompt_segment red black
+  #       st='±'
+  #     elif $( echo ${hg_st} | grep -q "^[MA]" ); then
+  #       prompt_segment yellow black
+  #       st='±'
+  #     else
+  #       prompt_segment green black
+  #     fi
+  #     echo -n "☿ $rev@$branch" $st
+  #   fi
+  # fi
 }
 
 # Dir: current working directory
